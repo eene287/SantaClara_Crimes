@@ -1,0 +1,151 @@
+---
+title: "626 Project EDA"
+author: "Erin Batta"
+date: "2024-06-16"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+setwd("~/STAT 626")
+
+rm(list=ls())
+data = read.csv("santa_clara_crime_data.csv")
+library(dplyr)
+library(astsa)
+library(MASS)
+
+```
+
+```{r}
+summary_stats = data%>%count(parent_incident_type)
+write.matrix(summary_stats,file="category_table.csv")
+```
+
+```{r}
+#### save whole dataset before reducing it
+all_data = data
+```
+
+
+```{r}
+#put date in date format
+data$incident_date = as.Date(data$incident_datetime,format="%m/%d/%Y")
+
+##reduce dataset to one observation per day - just date and number of total incidents
+data = data%>%count(incident_date)
+
+```
+
+```{r}
+#plot of number of crimes over time
+par(mfrow = c(1,1))
+plot(data$incident_date,data$n,type="l",xlab = "Date",ylab = "Number of Crimes",
+     col="maroon",main="Crimes in Santa Clara County, CA")
+```
+
+```{r}
+#set initial values for moving average
+v=c(data$n[1],data$n[2],data$n[3],data$n[4])
+
+#for loop for moving average calculation
+for (i in 5:857){
+  v = c(v,(data$n[i]+data$n[i-1]+data$n[i-2]+data$n[i-3]+data$n[i-4])/5)
+}
+#plot moving average
+plot(data$incident_date,v,type="l",xlab = "Date",ylab = "Number of Crimes",
+     col="maroon",main="Crimes in Santa Clara County, CA - MA(5)")
+```
+
+```{r}
+#acf plot for number of crimes
+acf1(data$n,main="")
+
+#see mean number in summer vs in winter
+library(lubridate)
+mean(data$n)
+mean(data$n[month(ymd(data$incident_date))>=4 & month(ymd(data$incident_date))<=8])
+mean(data$n[month(ymd(data$incident_date))<4 | month(ymd(data$incident_date))>8])
+
+```
+
+```{r}
+###################################################################################
+##################### All 27 Categories ###########################################
+##################################################################################
+
+#put date in date format
+all_data$incident_date = as.Date(all_data$incident_datetime,format="%m/%d/%Y")
+
+```
+
+```{r}
+##create dataset with just date and number of each type of crime
+fixed_data = all_data%>%group_by(incident_date)%>%
+  transmute(num_alarm = sum(parent_incident_type=="Alarm"),
+         num_arsons=sum(parent_incident_type=="Arson"),
+         num_assault=sum(parent_incident_type=="Assault"),
+         num_deadly = sum(parent_incident_type=="Assault with Deadly Weapon"),
+         num_break = sum(parent_incident_type=="Breaking & Entering"),
+         num_community = sum(parent_incident_type=="Community Policing"),
+         num_death = sum(parent_incident_type=="Death"),
+         num_disorder = sum(parent_incident_type=="Disorder"),
+         num_drugs = sum(parent_incident_type=="Drugs"),
+         num_family = sum(parent_incident_type=="Family Offense"),
+         num_fire = sum(parent_incident_type=="Fire"),
+         num_kidnapping = sum(parent_incident_type=="Kidnapping"),
+         num_liquor = sum(parent_incident_type=="Liquor"),
+         num_missing = sum(parent_incident_type=="Missing Person"),
+         num_other = sum(parent_incident_type=="Other"),
+         num_other_sexual = sum(parent_incident_type=="Other Sexual Offense"),
+         num_pedestrian = sum(parent_incident_type=="Pedestrian Stop"),
+         num_property = sum(parent_incident_type=="Property Crime"),
+         num_robbery=sum(parent_incident_type=="Robbery"),
+         num_sex_assault = sum(parent_incident_type=="Sexual Assault"),
+         num_theft = sum(parent_incident_type=="Theft"),
+         num_from_vehicle = sum(parent_incident_type=="Theft from Vehicle"),
+         num_of_vehicle = sum(parent_incident_type=="Theft of Vehicle"),
+         num_traffic = sum(parent_incident_type=="Traffic"),
+         num_vehicle_recovery = sum(parent_incident_type=="Vehicle Recovery"),
+         num_vehicle_stop = sum(parent_incident_type=="Vehicle Stop"),
+         num_weapons = sum(parent_incident_type=="Weapons Offense"))
+```
+
+```{r}
+###reduce to 1 row per date
+fixed_data = fixed_data%>%group_by(incident_date)%>%slice_head(n=1)
+```
+
+```{r}
+##### acf plots
+acf1(fixed_data$num_alarm)
+acf1(fixed_data$num_arsons)
+acf1(fixed_data$num_assault)
+acf1(fixed_data$num_break)
+acf1(fixed_data$num_deadly)
+acf1(fixed_data$num_community)
+acf1(fixed_data$num_death)
+acf1(fixed_data$num_disorder)  ##shows 7 day correlation, makes sense
+acf1(fixed_data$num_drugs)
+acf1(fixed_data$num_family)
+acf1(fixed_data$num_fire)
+acf1(fixed_data$num_kidnapping)
+acf1(fixed_data$num_liquor)
+acf1(fixed_data$num_missing)
+acf1(fixed_data$num_other)  ### 7 day correlation
+acf1(fixed_data$num_other_sexual)
+acf1(fixed_data$num_pedestrian)
+acf1(fixed_data$num_property)
+acf1(fixed_data$num_robbery)
+acf1(fixed_data$num_sex_assault)
+acf1(fixed_data$num_theft)  ### 7 day correlation
+acf1(fixed_data$num_from_vehicle)
+acf1(fixed_data$num_of_vehicle)
+acf1(fixed_data$num_traffic) ### 7 day correlation
+acf1(fixed_data$num_vehicle_recovery)  ### 7 day correlation
+acf1(fixed_data$num_vehicle_stop)  #### 7 day correlation
+acf1(fixed_data$num_weapons)
+```
