@@ -1,0 +1,243 @@
+# the Santa Clara Data
+
+### import formated "Data" from python and change from character to date###
+df=read.csv("sorted_santa_clara.csv")
+str(df)
+
+dd=df$Daydate
+
+df$date=as.Date(dd, format="%Y-%m-%d")
+str(df)
+
+tab=as.data.frame(table(df$date, df$parent_incident_type))
+tab=subset(tab, Freq>0)
+names(tab)=c("date", "type", "count")
+tab$date=as.Date(as.character(tab$date))
+str(tab)
+##################
+
+## make model for ALARMS ###
+vs=subset(tab, type=="Alarm")
+
+# impute missing dates ## code --> thu like wed (previous), sat like sun(next), tue like wed (next), sun like sat (prev)
+ 
+#day1 8-31-2017
+
+  d1=vs[which(vs$date=="2017-08-30"),]
+ d1$date="2017-08-31"
+
+#day2 
+
+ d2=vs[which(vs$date=="2017-10-01"),]
+ d2$date="2017-09-30"
+
+#day3 
+
+ d3=vs[which(vs$date=="2017-11-01"),]
+ d3$date="2017-10-31"
+
+#day4 
+
+ d4=vs[which(vs$date=="2017-11-29"),]
+ d4$date="2017-11-30"
+
+#day5 
+
+ d5=vs[which(vs$date=="2017-12-30"),]
+ d5$date="2017-12-31"
+
+# five_day_gap
+d6=vs[which(vs$date=="2018-01-30"),]
+ d6$date="2018-01-31"
+
+d7=d6
+d7$date="2018-02-01"
+
+d8=d6
+d8$date="2018-02-02"
+
+d9=vs[which(vs$date=="2018-02-05"),]
+d9$date="2018-02-03"
+
+d10=d9
+d10$date="2018-02-04"
+
+imp_vs=rbind(vs,d1, d2, d3, d4, d5,d6,d7,d8,d9,d10)
+ dim(imp_vs)
+ # [1] 867   3
+
+vs.data=imp_vs[order(imp_vs$date),]
+
+## set date as index ##
+rownames(vs.data)=vs.data$date
+tail(vs.data)
+
+summary(vs.data)
+
+###########
+ summary(ALARMS)
+      date                                    type         count      
+ Min.   :2017-08-01   Alarm                     :867   Min.   : 4.00  
+ 1st Qu.:2018-03-05   Arson                     :  0   1st Qu.:20.00  
+ Median :2018-10-08   Assault                   :  0   Median :24.00  
+ Mean   :2018-10-08   Assault with Deadly Weapon:  0   Mean   :25.11  
+ 3rd Qu.:2019-05-12   Breaking & Entering       :  0   3rd Qu.:29.00  
+ Max.   :2019-12-15   Community Policing        :  0   Max.   :63.00  
+                      (Other)                   :  0              
+
+#################
+
+vs.data[which(vs.data$count>=0.75*max(vs.data$count)),]
+
+###########
+                 date  type count
+2018-03-21 2018-03-21 Alarm    48
+2018-04-06 2018-04-06 Alarm    49
+2019-01-05 2019-01-05 Alarm    49
+2019-01-16 2019-01-16 Alarm    63
+2019-02-13 2019-02-13 Alarm    52
+2019-02-27 2019-02-27 Alarm    48
+2019-10-28 2019-10-28 Alarm    48
+2019-12-07 2019-12-07 Alarm    63
+
+########################################
+
+dat=vs.data$count
+
+library atsa
+## explore the time series dat
+
+par(mfrow=c(2,2))
+
+tsplot(dat, col=4)
+mtext("ALARMS", cex=0.8, side=4)
+qqnorm(dat)
+tsplot(diff(dat))
+tsplot(diff(diff(dat)))
+
+par(mfrow=c(2,3))
+acf(dat, col=1)
+acf(diff(dat), col=2)
+acf(diff(diff(dat)), col=4)
+pacf(dat, col=1)
+pacf(diff(dat), col=2)
+pacf(diff(diff(dat)), col=4)
+
+par(mfrow=c(3,2))
+tsplot(dat, main="Alarm Daily Counts")
+tsplot(diff(dat), main="Daily Difference in Alarms", col=3)
+acf(dat, col=2, lag.max=370)
+acf(diff(dat), col=3, lag.max=370)
+pacf(dat, col=4, lag.max=370)
+pacf(diff(dat), col=3, lag.max=370)
+
+## improve sarima performance 
+ts.matrix <- as.ts(dat)
+##############
+sarima(diff(ts.matrix),p=6, d=0, q=1, no.constant=FALSE)
+<><><><><><><><><><><><><><>
+ 
+Coefficients: 
+      Estimate     SE   t.value p.value
+ar1     0.1709 0.0350    4.8781  0.0000
+ar2     0.0992 0.0352    2.8191  0.0049
+ar3     0.0139 0.0351    0.3968  0.6916
+ar4    -0.0223 0.0351   -0.6348  0.5257
+ar5     0.0715 0.0352    2.0315  0.0425
+ar6     0.0289 0.0350    0.8251  0.4095
+ma1    -0.9915 0.0095 -104.7918  0.0000
+xmean   0.0015 0.0037    0.4223  0.6729
+
+sigma^2 estimated as 47.17261 on 858 degrees of freedom 
+ 
+AIC = 6.716283  AICc = 6.716477  BIC = 6.765792 
+
+####################
+
+sarima(diff(ts.matrix),p=4, d=0, q=1, no.constant=TRUE)
+<><><><><><><><><><><><><><>
+Coefficients: 
+    Estimate     SE  t.value p.value
+ar1   0.1603 0.0388   4.1364  0.0000
+ar2   0.0900 0.0377   2.3880  0.0172
+ar3   0.0119 0.0375   0.3168  0.7515
+ar4  -0.0180 0.0380  -0.4744  0.6354
+ma1  -0.9790 0.0196 -49.8679  0.0000
+
+sigma^2 estimated as 47.4857 on 861 degrees of freedom 
+ 
+AIC = 6.715264  AICc = 6.715345  BIC = 6.74827 
+##############
+
+
+sarima(diff(ts.matrix),p=2, d=0, q=1, no.constant=TRUE)
+
+<><><><><><><><><><><><><><>
+ 
+Coefficients: 
+    Estimate     SE  t.value p.value
+ar1   0.1626 0.0372   4.3717  0.0000
+ar2   0.0915 0.0370   2.4724  0.0136
+ma1  -0.9806 0.0148 -66.2199  0.0000
+
+sigma^2 estimated as 47.50153 on 863 degrees of freedom 
+ 
+AIC = 6.711039  AICc = 6.711071  BIC = 6.733043 
+
+
+sarima(ts.matrix,p=2, d=1, q=1, no.constant=TRUE)		
+## same results ######
+<><><><><><><><><><><><><><>
+
+chosen  #####  chosen  #####
+
+sarima(ts.matrix,2, 1, 1, 1,0,0,7, no.constant=TRUE )
+
+chosen  #####
+
+<><><><><><><><><><><><><><>	
+Coefficients: 
+     Estimate     SE   t.value p.value
+ar1    0.1664 0.0351    4.7420  0.0000
+ar2    0.0932 0.0351    2.6574  0.0080
+ma1   -0.9877 0.0094 -104.8394  0.0000
+sar1   0.0849 0.0349    2.4354  0.0151
+
+sigma^2 estimated as 47.16347 on 862 degrees of freedom 
+ 
+AIC = 6.706583  AICc = 6.706637  BIC = 6.734088 
+###############
+
+
+ ## forecast one week
+sarima.for(ts.matrix,7,2, 1, 1,1,0,0,7, gg=TRUE, col=4, main="Alarms in Santa Clara County - Daily Counts", xlab=c("Day of Record")) 
+
+## GARCH modeling
+
+### explore the log transform 
+par(mfrow=c(4,2))
+
+tsplot(dat, col=4)
+mtext("ALARMS", cex=0.8, side=4)
+qqnorm(dat)
+tsplot(diff(dat))
+mtext("Diff(ALARMS)", cex=0.8, side=4)
+qqnorm(diff(dat))
+tsplot(log(dat))
+mtext("Log(ALARMS)", cex=0.8, side=4)
+qqnorm(log(dat))
+tsplot(diff(log(dat)))
+mtext("Diff(Log(ALARMS))", cex=0.8, side=4)
+qqnorm(diff(log(dat)))
+
+rdat=diff(log(dat))
+ rdatsq=rdat^2
+
+acf2(rdat)
+acf2(rdatsq) 
+mtext("Diff(Log(ALARMS))", cex=0.8, side=3)
+
+vs.g=garchFit(~arma(2,1)+garch(2,1),data=rdat)
+
+plot(vs.g, which=3)
+summary(vs.g)

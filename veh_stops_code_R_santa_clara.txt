@@ -1,0 +1,288 @@
+# the Santa Clara Data
+# https://files.santaclaracounty.gov/migrated/CSU%20Annual%20Report%202022%20-%20FINAL.pdf
+# https://www.alamy.com/vector-road-map-of-california-santa-clara-county-united-states-image449605332.html
+
+### import formated "Data" from python and change from character to date###
+df=read.csv("sorted_santa_clara.csv")
+str(df)
+
+dd=df$Daydate
+
+df$date=as.Date(dd, format="%Y-%m-%d")
+str(df)
+
+tab=as.data.frame(table(df$date, df$parent_incident_type))
+tab=subset(tab, Freq>0)
+names(tab)=c("date", "type", "count")
+tab$date=as.Date(as.character(tab$date))
+str(tab)
+
+## make model for vehicle stops ###
+vs=subset(tab, type=="Vehicle Stop")
+
+# impute missing dates ## code --> thu like wed (previous), sat like sun(next), tue like wed (next), sun like sat (prev)
+ 
+#day1 8-31-2017
+
+  d1=vs[which(vs$date=="2017-08-30"),]
+ d1$date="2017-08-31"
+
+#day2 
+
+ d2=vs[which(vs$date=="2017-10-01"),]
+ d2$date="2017-09-30"
+
+#day3 
+
+ d3=vs[which(vs$date=="2017-11-01"),]
+ d3$date="2017-10-31"
+
+#day4 
+
+ d4=vs[which(vs$date=="2017-11-29"),]
+ d4$date="2017-11-30"
+
+#day5 
+
+ d5=vs[which(vs$date=="2017-12-30"),]
+ d5$date="2017-12-31"
+
+# five_day_gap
+d6=vs[which(vs$date=="2018-01-30"),]
+ d6$date="2018-01-31"
+
+d7=d6
+d7$date="2018-02-01"
+
+d8=d6
+d8$date="2018-02-02"
+
+d9=vs[which(vs$date=="2018-02-05"),]
+d9$date="2018-02-03"
+
+d10=d9
+d10$date="2018-02-04"
+
+imp_vs=rbind(vs,d1, d2, d3, d4, d5,d6,d7,d8,d9,d10)
+ dim(imp_vs)
+ # [1] 867   3
+
+vs.data=imp_vs[order(imp_vs$date),]
+
+## set date as index ##
+rownames(vs.data)=vs.data$date
+tail(vs.data)
+
+summary(vs.data)
+
+###########
+> summary(vs.data)
+      date                                    type         count       
+ Min.   :2017-08-01   Vehicle Stop              :867   Min.   :  9.00  
+ 1st Qu.:2018-03-05   Alarm                     :  0   1st Qu.: 62.50  
+ Median :2018-10-08   Arson                     :  0   Median : 79.00  
+ Mean   :2018-10-08   Assault                   :  0   Mean   : 80.52  
+ 3rd Qu.:2019-05-12   Assault with Deadly Weapon:  0   3rd Qu.: 98.00  
+ Max.   :2019-12-15   Breaking & Entering       :  0   Max.   :211.00  
+                      (Other)                   :  0                  
+
+#################
+
+vs.data[which(vs.data$count>=0.8*max(vs.data$count)),]
+
+###########
+ vs.data[which(vs.data$count>=140),]
+                 date         type count
+2017-10-06 2017-10-06 Vehicle Stop   147
+2018-01-18 2018-01-18 Vehicle Stop   143
+2018-02-08 2018-02-08 Vehicle Stop   140
+2018-08-01 2018-08-01 Vehicle Stop   142
+2019-01-24 2019-01-24 Vehicle Stop   150
+2019-02-07 2019-02-07 Vehicle Stop   141
+2019-02-12 2019-02-12 Vehicle Stop   148
+2019-02-20 2019-02-20 Vehicle Stop   146
+2019-08-06 2019-08-06 Vehicle Stop   150
+2019-08-08 2019-08-08 Vehicle Stop   211
+2019-08-28 2019-08-28 Vehicle Stop   166
+########################################
+
+dat=vs.data$count
+
+par(mfrow=c(4,2))
+
+tsplot(dat, col=4)
+mtext("Vehicle Stops", cex=0.8, side=4)
+qqnorm(dat)
+tsplot(diff(dat))
+mtext("Diff(Vehicle Stops)", cex=0.8, side=4)
+qqnorm(diff(dat))
+tsplot(log(dat))
+mtext("Log(Vehicle Stops)", cex=0.8, side=4)
+qqnorm(log(dat))
+tsplot(diff(log(dat)))
+mtext("Diff(Log(Vehicle Stops))", cex=0.8, side=4)
+qqnorm(diff(log(dat)))
+
+## explore the time series dat
+par(mfrow=c(2,2))
+qqnorm(dat)
+legend(1, 95, legend=c("VehicleStops"), cex=0.8)
+tsplot(dat)
+tsplot(diff(dat))
+tsplot(diff(diff(dat)))
+
+par(mfrow=c(2,3))
+acf(dat, col=1)
+acf(diff(dat), col=2)
+acf(diff(diff(dat)), col=4)
+pacf(dat, col=1)
+pacf(diff(dat), col=2)
+pacf(diff(diff(dat)), col=4)
+
+## decompose the daily counts for vs ###
+
+decomp<-stl(dat,s.window="periodic")
+plot(decomp)
+# Error in stl(dat, s.window = "periodic") : 
+  series is not periodic or has less than two periods
+
+par(mfrow=c(3,2))
+tsplot(dat, main="Vehicle Stops Daily Counts")
+tsplot(diff(dat), main="Daily Difference in Vehicle Stops", col=3)
+acf(dat, col=2, lag.max=370)
+acf(diff(dat), col=3, lag.max=370)
+pacf(dat, col=4, lag.max=370)
+pacf(diff(dat), col=3, lag.max=370)
+
+##############
+sarima(dat, 1, 0, 3, 1,1,1,7)
+Coefficients: 
+         Estimate     SE  t.value p.value
+ar1        0.9641 0.0252  38.1941  0.0000
+ma1       -0.7332 0.0422 -17.3819  0.0000
+ma2       -0.1193 0.0439  -2.7210  0.0066
+ma3       -0.0436 0.0364  -1.1976  0.2314
+sar1       0.0098 0.0377   0.2605  0.7945
+sma1      -0.9532 0.0139 -68.7695  0.0000
+constant  -0.0111 0.0163  -0.6815  0.4957
+
+sigma^2 estimated as 403.4501 on 853 degrees of freedom 
+ 
+AIC = 8.874704  AICc = 8.874857  BIC = 8.918954 
+####################
+
+sarima(dat, 1, 0, 2, 0,1,1,7)
+converged
+<><><><><><><><><><><><><><>  chosen #########
+ 
+Coefficients: 
+         Estimate     SE  t.value p.value
+ar1        0.9553 0.0292  32.7249  0.0000
+ma1       -0.7295 0.0449 -16.2442  0.0000
+ma2       -0.1470 0.0364  -4.0365  0.0001
+sma1      -0.9512 0.0134 -70.9354  0.0000
+constant  -0.0109 0.0160  -0.6792  0.4972
+
+sigma^2 estimated as 404.191 on 855 degrees of freedom 
+ 
+AIC = 8.871727  AICc = 8.871809  BIC = 8.904915 
+
+
+####################
+sarima(dat, 1, 1,1, 0,1,1,7)
+oefficients: 
+     Estimate     SE  t.value p.value
+ar1    0.2021 0.0372   5.4343       0
+ma1   -0.9554 0.0147 -65.1555       0
+sma1  -0.9540 0.0126 -75.9791       0
+
+sigma^2 estimated as 407.5189 on 856 degrees of freedom 
+ 
+AIC = 8.882057  AICc = 8.88209  BIC = 8.904203 
+
+
+<><><><><><><><><><><><><><>
+sarima(dat, p=1, d=0, q=2, P=0, D=1, Q=1, S=7)
+
+ts.matrix <- as.ts(dat)
+ ## forcast one year
+sarima.for(ts.matrix,14, 1,0,2, 0,1,1,7)
+
+time=vs.data$date[763:867]
+time=c(time, "2019-12-16", "2019-12-17","2019-12-18","2019-12-19","2019-12-20","2019-12-21","2019-12-22" )
+count=vs.data$count[763:867]
+count=c(count, rep(0,7))
+
+
+sarima.for(ts.matrix,7,1,0,2,0,1,1,7, gg=TRUE, col=4, main="Vehicle Stops in Santa Clara County - Daily Counts", xlab=c("Day of Record")) 
+
+## GARCH modeling
+
+### explore the log transform 
+par(mfrow=c(4,2))
+
+tsplot(dat, col=4)
+mtext("Vehicle Stops", cex=0.8, side=4)
+qqnorm(dat)
+tsplot(diff(dat))
+mtext("Diff(Vehicle Stops)", cex=0.8, side=4)
+qqnorm(diff(dat))
+tsplot(log(dat))
+mtext("Log(Vehicle Stops)", cex=0.8, side=4)
+qqnorm(log(dat))
+tsplot(diff(log(dat)))
+mtext("Diff(Log(Vehicle Stops))", cex=0.8, side=4)
+qqnorm(diff(log(dat)))
+
+### introduce return
+rdat=diff(log(dat))
+ rdatsq=rdat^2
+
+par(mfrow=c(2,2))
+acf2(rdat)
+acf2(rdatsq) 
+mtext("Diff(Log(Vehicle Stops))", cex=0.8, side=3)
+### no strucure ###
+
+vs.g=garchFit(~arma(1,2)+garch(1,2),data=rdat)
+
+plot(vs.g, which=3)
+
+summary(vs.g)
+
+
+Error Analysis:
+         Estimate  Std. Error  t value Pr(>|t|)    
+mu     -6.386e-04   5.565e-04   -1.148  0.25116    
+ar1     1.623e-01   7.911e-02    2.052  0.04018 *  
+ma1    -7.661e-01   7.434e-02  -10.306  < 2e-16 ***
+ma2    -1.818e-01   6.963e-02   -2.612  0.00901 ** 
+omega   6.984e-03   4.973e-03    1.404  0.16020    
+alpha1  5.903e-02   2.104e-02    2.805  0.00502 ** 
+beta1   1.000e-08   4.923e-02    0.000  1.00000    
+beta2   8.718e-01   4.847e-02   17.985  < 2e-16 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Log Likelihood:
+ -218.552    normalized:  -0.2523696 
+
+Description:
+ Sun Jul 28 22:50:11 2024 by user: Mama 
+
+
+Standardised Residuals Tests:
+                                  Statistic      p-Value
+ Jarque-Bera Test   R    Chi^2  300.4030191 0.000000e+00
+ Shapiro-Wilk Test  R    W        0.9687985 1.170554e-12
+ Ljung-Box Test     R    Q(10)  146.6817503 0.000000e+00
+ Ljung-Box Test     R    Q(15)  251.2331239 0.000000e+00
+ Ljung-Box Test     R    Q(20)  335.1978789 0.000000e+00
+ Ljung-Box Test     R^2  Q(10)    3.4451105 9.689293e-01
+ Ljung-Box Test     R^2  Q(15)    4.5523191 9.952861e-01
+ Ljung-Box Test     R^2  Q(20)    6.9749831 9.967663e-01
+ LM Arch Test       R    TR^2     3.7674935 9.872758e-01
+
+Information Criterion Statistics:
+      AIC       BIC       SIC      HQIC 
+0.5232149 0.5672230 0.5230462 0.5400573 

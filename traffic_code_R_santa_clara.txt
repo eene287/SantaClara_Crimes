@@ -1,0 +1,207 @@
+# the Santa Clara Data
+
+### import formated "Data" from python and change from character to date###
+## FOLDER "Santa Clara"
+
+df=read.csv("sorted_santa_clara.csv")
+str(df)
+
+dd=df$Daydate
+
+df$date=as.Date(dd, format="%Y-%m-%d")
+str(df)
+
+tab=as.data.frame(table(df$date, df$parent_incident_type))
+tab=subset(tab, Freq>0)
+names(tab)=c("date", "type", "count")
+tab$date=as.Date(as.character(tab$date))
+str(tab)
+##################
+
+## make model for TRAFFIC ###
+vs=subset(tab, type=="Traffic")
+
+# impute missing dates ## code --> thu like wed (previous), sat like sun(next), tue like wed (next), sun like sat (prev)
+ 
+#day1 8-31-2017
+
+  d1=vs[which(vs$date=="2017-08-30"),]
+ d1$date="2017-08-31"
+
+#day2 
+
+ d2=vs[which(vs$date=="2017-10-01"),]
+ d2$date="2017-09-30"
+
+#day3 
+
+ d3=vs[which(vs$date=="2017-11-01"),]
+ d3$date="2017-10-31"
+
+#day4 
+
+ d4=vs[which(vs$date=="2017-11-29"),]
+ d4$date="2017-11-30"
+
+#day5 
+
+ d5=vs[which(vs$date=="2017-12-30"),]
+ d5$date="2017-12-31"
+
+# five_day_gap
+d6=vs[which(vs$date=="2018-01-30"),]
+ d6$date="2018-01-31"
+
+d7=d6
+d7$date="2018-02-01"
+
+d8=d6
+d8$date="2018-02-02"
+
+d9=vs[which(vs$date=="2018-02-05"),]
+d9$date="2018-02-03"
+
+d10=d9
+d10$date="2018-02-04"
+
+imp_vs=rbind(vs,d1, d2, d3, d4, d5,d6,d7,d8,d9,d10)
+ dim(imp_vs)
+ # [1] 867   3
+
+vs.data=imp_vs[order(imp_vs$date),]
+
+## set date as index ##
+rownames(vs.data)=vs.data$date
+tail(vs.data)
+
+summary(vs.data)
+
+###########
+ summary(TRAFIC)
+   date                                    type         count      
+ Min.   :2017-08-01   Traffic                   :867   Min.   : 3.00  
+ 1st Qu.:2018-03-05   Alarm                     :  0   1st Qu.:15.50  
+ Median :2018-10-08   Arson                     :  0   Median :19.00  
+ Mean   :2018-10-08   Assault                   :  0   Mean   :19.56  
+ 3rd Qu.:2019-05-12   Assault with Deadly Weapon:  0   3rd Qu.:23.00  
+ Max.   :2019-12-15   Breaking & Entering       :  0   Max.   :50.00  
+                      (Other)                   :  0   
+
+#################
+
+vs.data[which(vs.data$count>=0.8*max(vs.data$count)),]
+
+###########
+> vs.data[which(vs.data$count>=0.8*max(vs.data$count)),]
+                 date    type count
+2018-03-01 2018-03-01 Traffic    42
+2019-01-16 2019-01-16 Traffic    50
+2019-03-29 2019-03-29 Traffic    40
+2019-10-24 2019-10-24 Traffic    42
+
+
+########################################
+
+dat=vs.data$count
+
+library astsa
+## explore the time series dat
+
+par(mfrow=c(2,2))
+
+tsplot(dat, col=4)
+mtext("Traffic ", cex=0.8, side=4)
+qqnorm(dat, col=4)
+tsplot(diff(dat))
+mtext("Traffic", cex=0.8, side=4)
+qqnorm(diff(dat))
+
+par(mfrow=c(3,2))
+tsplot(dat, main="Traffic Counts")
+tsplot(diff(dat), main="Daily Difference in Traffic", col=3)
+acf(dat, col=2, lag.max=40)
+acf(diff(dat), col=3, lag.max=40)
+pacf(dat, col=4, lag.max=40)
+pacf(diff(dat), col=3, lag.max=40)
+
+par(mfrow=c(3,2))
+tsplot(dat, main="Traffic Counts")
+tsplot(diff(dat), main="Daily Difference in Traffic", col=3)
+acf(dat, col=2, lag.max=370)
+acf(diff(dat), col=3, lag.max=370)
+pacf(dat, col=4, lag.max=370)
+pacf(diff(dat), col=3, lag.max=370)
+
+## take difference or order 1
+ddat=diff(dat)
+
+### periodogram
+Fr=0:866/867
+p=Mod(fft(dat)/sqrt(867))^2
+sp=(4/867)*p
+tsplot(Fr,sp,xlab="frequency", ylab="scaled periodogram", col=4)
+mtext("Scaled periodogram for Traffic")
+
+Fr=0:865/866
+p=Mod(fft(ddat)/sqrt(866))^2
+sp=(4/866)*p
+tsplot(Fr,sp,xlab="frequency", ylab="scaled periodogram", col=4)
+mtext("Scaled periodogram for Nabla Traffic")
+
+## print values
+sp[80:160]
+
+## improve sarima performance 
+ts=as.ts(dat)
+tsd<- as.ts(ddat)
+##############  CHOSEN
+           sarima(ts, p=1, d=0, q=0, P=2, D=0, Q=0, S=7,no.constant=FALSE)
+<><><><><><><><><><><><><><>
+<><><><><><><><><><><><><><>
+Coefficients: 
+      Estimate     SE t.value p.value
+ar1     0.1650 0.0339  4.8656       0
+sar1    0.2013 0.0338  5.9585       0
+sar2    0.1811 0.0336  5.3824       0
+xmean  19.5405 0.3681 53.0831       0
+
+sigma^2 estimated as 31.72 on 863 degrees of freedom 
+ 
+AIC = 6.307432  AICc = 6.307485  BIC = 6.334912 
+ 
+##########################################
+
+
+ ## forecast two weeks
+ 
+sarima.for(ts, 14,1,0, 0, 2, 0, 0, 7, gg=TRUE, col=4, main="Traffic Incidents in Santa Clara County - Daily Counts", xlab=c("Day of Record")) 
+
+## GARCH modeling
+
+### explore the log transform 
+par(mfrow=c(4,2))
+
+tsplot(dat, col=4)
+mtext("ALARMS", cex=0.8, side=4)
+qqnorm(dat)
+tsplot(diff(dat))
+mtext("Diff(ALARMS)", cex=0.8, side=4)
+qqnorm(diff(dat))
+tsplot(log(dat))
+mtext("Log(ALARMS)", cex=0.8, side=4)
+qqnorm(log(dat))
+tsplot(diff(log(dat)))
+mtext("Diff(Log(ALARMS))", cex=0.8, side=4)
+qqnorm(diff(log(dat)))
+
+rdat=diff(log(dat))
+ rdatsq=rdat^2
+
+acf2(rdat)
+acf2(rdatsq) 
+mtext("Diff(Log(ALARMS))", cex=0.8, side=3)
+
+vs.g=garchFit(~arma(2,1)+garch(2,1),data=rdat)
+
+plot(vs.g, which=3)
+summary(vs.g)
