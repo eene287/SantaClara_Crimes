@@ -6,7 +6,7 @@ This project is in-depth analysis of the Santa Clara Crime Dataset, which encomp
 
 The analysis focuses on understanding temporal patterns and forecasting future occurrences for a total of sixteen time series. The statistical methods employed were data transformation to stationarity, Autoregressive Integrated Moving Average with Seasonality, ARMA and SARIMA, and Generalized Auto Regressive Conditional Heteroskedasticity GARCH.
 
-Project Motivation
+Project Motivation \
 There has been a call to action to reform the public policies in the Bay Area, particularly in criminal justice. The crime rate has been in the national and local news with a bias favoring a “tough on crime” approach. As my family is working in high-tech and living in Santa Clara County, it is experiencing a perception of higher-than-normal crime rates. That may be fueled by news correspondents.
 This project deploys a detailed analysis of the data to answer the question: “Is crime really on the rise?” 
 
